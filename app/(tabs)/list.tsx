@@ -1,112 +1,206 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
-  FlatList,
+  TextInput,
   StyleSheet,
-  StatusBar,
   TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+  FlatList,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from "@react-native-picker/picker";
+import { useForm, Controller } from "react-hook-form";
 
-const api = "https://dummyjson.com/todos";
-
-type Todo = {
+type Task = {
   id: number;
-  todo: string;
-  completed: boolean;
-  userId: number;
+  title: string;
+  date: Date;
+  priority: "low" | "medium" | "high";
+  status: "to-do" | "done";
 };
 
-const TodoItem = ({ item, onPress }: { item: Todo; onPress: (item: Todo) => void }) => (
-  <TouchableOpacity style={styles.item} onPress={() => onPress(item)}>
-    <Text style={[styles.text, item.completed && styles.completed]}>
-      {item.todo}
-    </Text>
-  </TouchableOpacity>
-);
+type FormData = {
+  title: string;
+  date: Date;
+  priority: "low" | "medium" | "high";
+};
 
-export default function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function ListScreen() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskId, setTaskId] = useState(1);
 
-  useEffect(() => {
-    fetchTodos();
-  }, []);
+  const { control, handleSubmit, reset } = useForm<FormData>({
+    defaultValues: {
+      title: "",
+      date: new Date(),
+      priority: "medium",
+    },
+  });
 
-  const fetchTodos = async () => {
-    try {
-      const response = await fetch(api);
-      const data = await response.json();
-      setTodos(data.todos); 
-    } catch (error) {
-      Alert.alert("Error", "Failed to load todos.");
-    } finally {
-      setLoading(false);
-    }
+  const onSubmit = (data: FormData) => {
+    const newTask: Task = {
+      id: taskId,
+      title: data.title,
+      date: data.date,
+      priority: data.priority,
+      status: "to-do",
+    };
+    setTasks([...tasks, newTask]);
+    setTaskId((id) => id + 1);
+    reset();
   };
 
-  const handlePress = (item: Todo) => {
-    Alert.alert("Todo", item.todo);
+  const toggleTaskStatus = (id: number) => {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id
+          ? { ...task, status: task.status === "to-do" ? "done" : "to-do" }
+          : task
+      )
+    );
   };
 
- return (
-  <SafeAreaProvider>
-    <SafeAreaView style={styles.container}>
-      {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#000" />
-        </View>
-      ) : (
-        <>
-          <Text style={styles.header}>TODO List</Text>
-          <FlatList
-            data={todos}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <TodoItem item={item} onPress={handlePress} />}
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.header}>📝 To-Do List</Text>
+
+        {/* Form */}
+        <View style={styles.form}>
+          <Text style={styles.label}>Title</Text>
+          <Controller
+            control={control}
+            name="title"
+            render={({ field: { onChange, value } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Enter task title"
+                value={value}
+                onChangeText={onChange}
+              />
+            )}
           />
-        </>
-      )}
-    </SafeAreaView>
-  </SafeAreaProvider>
-);
 
+          <Text style={styles.label}>Date</Text>
+          <Controller
+            control={control}
+            name="date"
+            render={({ field: { onChange, value } }) => (
+              <DateTimePicker
+                value={value}
+                onChange={(e, selectedDate) => {
+                  if (selectedDate) onChange(selectedDate);
+                }}
+                mode="date"
+              />
+            )}
+          />
+
+          <Text style={styles.label}>Priority</Text>
+          <View style={styles.pickerWrapper}>
+            <Controller
+              control={control}
+              name="priority"
+              render={({ field: { onChange, value } }) => (
+                <Picker
+                  selectedValue={value}
+                  onValueChange={onChange}
+                  style={{ height: 40 }}
+                >
+                  <Picker.Item label="Low" value="low" />
+                  <Picker.Item label="Medium" value="medium" />
+                  <Picker.Item label="High" value="high" />
+                </Picker>
+              )}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)}>
+            <Text style={styles.buttonText}>Add Task</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* List */}
+        <View style={{ paddingBottom: 100 }}>
+          {tasks.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.taskCard,
+                item.status === "done" && { backgroundColor: "#d0f0c0" },
+              ]}
+              onPress={() => toggleTaskStatus(item.id)}
+            >
+              <Text style={styles.taskTitle}>{item.title}</Text>
+              <Text>{item.date.toDateString()}</Text>
+              <Text>Priority: {item.priority}</Text>
+              <Text>Status: {item.status}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
 }
 
 const styles = StyleSheet.create({
-  header: {
-  fontSize: 24,
-  fontWeight: 'bold',
-  textAlign: 'center',
-  marginBottom: 16,
-  marginTop: 8,
-  color: '#333',
-  },
   container: {
-    flex: 1,
-    marginTop: StatusBar.currentHeight || 0,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-  },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  item: {
     padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f4f4f4',
-    marginBottom: 10,
   },
-  text: {
+  header: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  form: {
+    marginBottom: 20,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 10,
+    padding: 12,
+  },
+  label: {
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+  input: {
+    backgroundColor: "white",
+    padding: 10,
+    marginTop: 4,
+    borderRadius: 6,
+  },
+  pickerWrapper: {
+    backgroundColor: "#fff",
+    marginTop: 4,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  button: {
+    backgroundColor: "#3498db",
+    padding: 10,
+    marginTop: 16,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  taskCard: {
+    backgroundColor: "white",
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 6,
+    elevation: 1,
+  },
+  taskTitle: {
+    fontWeight: "bold",
     fontSize: 16,
-    color: '#333',
-  },
-  completed: {
-    textDecorationLine: 'line-through',
-    color: '#999',
   },
 });
