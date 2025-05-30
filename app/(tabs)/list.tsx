@@ -1,18 +1,19 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { useForm, Controller } from "react-hook-form";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Task = {
   id: number;
@@ -28,6 +29,8 @@ type FormData = {
   priority: "low" | "medium" | "high";
 };
 
+const TASKS_STORAGE_KEY = "TASKS_STORAGE_KEY";
+
 export default function ListScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskId, setTaskId] = useState(1);
@@ -40,6 +43,35 @@ export default function ListScreen() {
     },
   });
 
+  useEffect(() => {
+    loadTasksFromStorage();
+  }, []);
+
+  useEffect(() => {
+    saveTasksToStorage(tasks);
+  }, [tasks]);
+
+  const loadTasksFromStorage = async () => {
+    try {
+      const data = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data) as Task[];
+        setTasks(parsed);
+        setTaskId(parsed.length > 0 ? parsed[parsed.length - 1].id + 1 : 1);
+      }
+    } catch (e) {
+      Alert.alert("Error loading tasks");
+    }
+  };
+
+  const saveTasksToStorage = async (tasksToSave: Task[]) => {
+    try {
+      await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasksToSave));
+    } catch (e) {
+      Alert.alert("Error saving tasks");
+    }
+  };
+
   const onSubmit = (data: FormData) => {
     const newTask: Task = {
       id: taskId,
@@ -49,19 +81,23 @@ export default function ListScreen() {
       status: "to-do",
     };
     setTasks([...tasks, newTask]);
-    setTaskId((id) => id + 1);
+    setTaskId(taskId + 1);
     reset();
   };
 
   const toggleTaskStatus = (id: number) => {
     setTasks((prev) =>
       prev.map((task) =>
-        task.id === id
-          ? { ...task, status: task.status === "to-do" ? "done" : "to-do" }
-          : task
+        task.id === id ? { ...task, status: "done" } : task
       )
     );
+
+    setTimeout(() => {
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+    }, 1000);
   };
+
+
 
   return (
     <KeyboardAvoidingView
@@ -138,7 +174,7 @@ export default function ListScreen() {
               onPress={() => toggleTaskStatus(item.id)}
             >
               <Text style={styles.taskTitle}>{item.title}</Text>
-              <Text>{item.date.toDateString()}</Text>
+              <Text>{new Date(item.date).toDateString()}</Text>
               <Text>Priority: {item.priority}</Text>
               <Text>Status: {item.status}</Text>
             </TouchableOpacity>
