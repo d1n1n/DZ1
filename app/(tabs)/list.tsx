@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,106 +8,67 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-} from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
-import { useForm, Controller } from "react-hook-form";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
+import { useForm, Controller } from 'react-hook-form';
 
-type Task = {
-  id: number;
-  title: string;
-  date: Date;
-  priority: "low" | "medium" | "high";
-  status: "to-do" | "done";
-};
+import { useORM } from '../services/orm';
+import { Task } from '../../db/schema';
 
 type FormData = {
   title: string;
   date: Date;
-  priority: "low" | "medium" | "high";
+  priority: 'low' | 'medium' | 'high';
 };
 
-const TASKS_STORAGE_KEY = "TASKS_STORAGE_KEY";
-
 export default function ListScreen() {
+  const { getTasks, addTask, deleteTask, toggleTaskStatus } = useORM();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [taskId, setTaskId] = useState(1);
-
   const { control, handleSubmit, reset } = useForm<FormData>({
     defaultValues: {
-      title: "",
+      title: '',
       date: new Date(),
-      priority: "medium",
+      priority: 'medium',
     },
   });
 
+  const loadTasks = async () => {
+    const data = await getTasks();
+    setTasks(data);
+  };
+
   useEffect(() => {
-    loadTasksFromStorage();
+    loadTasks();
   }, []);
 
-  useEffect(() => {
-    saveTasksToStorage(tasks);
-  }, [tasks]);
-
-  const loadTasksFromStorage = async () => {
-    try {
-      const data = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
-      if (data) {
-        const parsed = JSON.parse(data) as Task[];
-        setTasks(parsed);
-        setTaskId(parsed.length > 0 ? parsed[parsed.length - 1].id + 1 : 1);
-      }
-    } catch (e) {
-      Alert.alert("Error loading tasks");
-    }
-  };
-
-  const saveTasksToStorage = async (tasksToSave: Task[]) => {
-    try {
-      await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasksToSave));
-    } catch (e) {
-      Alert.alert("Error saving tasks");
-    }
-  };
-
-  const onSubmit = (data: FormData) => {
-    const newTask: Task = {
-      id: taskId,
+  const onSubmit = async (data: FormData) => {
+    await addTask({
       title: data.title,
-      date: data.date,
+      date: data.date.toISOString(),
       priority: data.priority,
-      status: "to-do",
-    };
-    setTasks([...tasks, newTask]);
-    setTaskId(taskId + 1);
+    });
+    await loadTasks();
     reset();
   };
 
-  const toggleTaskStatus = (id: number) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, status: "done" } : task
-      )
-    );
-
-    setTimeout(() => {
-      setTasks((prev) => prev.filter((task) => task.id !== id));
-    }, 1000);
+  const onToggleStatus = async (task: Task) => {
+    if (task.status === 'done') {
+      await deleteTask(task.id);
+    } else {
+      await toggleTaskStatus(task.id, task.status);
+    }
+    await loadTasks();
   };
-
-
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.header}>📝 To-Do List</Text>
 
-        {/* Form */}
         <View style={styles.form}>
           <Text style={styles.label}>Title</Text>
           <Controller
@@ -130,10 +91,10 @@ export default function ListScreen() {
             render={({ field: { onChange, value } }) => (
               <DateTimePicker
                 value={value}
+                mode="date"
                 onChange={(e, selectedDate) => {
                   if (selectedDate) onChange(selectedDate);
                 }}
-                mode="date"
               />
             )}
           />
@@ -162,21 +123,20 @@ export default function ListScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* List */}
         <View style={{ paddingBottom: 100 }}>
-          {tasks.map((item) => (
+          {tasks.map((task) => (
             <TouchableOpacity
-              key={item.id}
+              key={task.id}
               style={[
                 styles.taskCard,
-                item.status === "done" && { backgroundColor: "#d0f0c0" },
+                task.status === 'done' && { backgroundColor: '#d0f0c0' },
               ]}
-              onPress={() => toggleTaskStatus(item.id)}
+              onPress={() => onToggleStatus(task)}
             >
-              <Text style={styles.taskTitle}>{item.title}</Text>
-              <Text>{new Date(item.date).toDateString()}</Text>
-              <Text>Priority: {item.priority}</Text>
-              <Text>Status: {item.status}</Text>
+              <Text style={styles.taskTitle}>{task.title}</Text>
+              <Text>{new Date(task.date).toDateString()}</Text>
+              <Text>Priority: {task.priority}</Text>
+              <Text>Status: {task.status}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -191,52 +151,52 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
+    fontWeight: 'bold',
+    textAlign: 'center',
     marginBottom: 16,
   },
   form: {
     marginBottom: 20,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: '#f9f9f9',
     borderRadius: 10,
     padding: 12,
   },
   label: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginTop: 10,
   },
   input: {
-    backgroundColor: "white",
+    backgroundColor: 'white',
     padding: 10,
     marginTop: 4,
     borderRadius: 6,
   },
   pickerWrapper: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     marginTop: 4,
     borderRadius: 6,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   button: {
-    backgroundColor: "#3498db",
+    backgroundColor: '#3498db',
     padding: 10,
     marginTop: 16,
     borderRadius: 6,
-    alignItems: "center",
+    alignItems: 'center',
   },
   buttonText: {
-    color: "white",
-    fontWeight: "bold",
+    color: 'white',
+    fontWeight: 'bold',
   },
   taskCard: {
-    backgroundColor: "white",
+    backgroundColor: 'white',
     marginTop: 10,
     padding: 12,
     borderRadius: 6,
     elevation: 1,
   },
   taskTitle: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
     fontSize: 16,
   },
 });
