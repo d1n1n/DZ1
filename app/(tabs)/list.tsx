@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import { useForm, Controller } from 'react-hook-form';
 
-import { useORM } from '../services/orm';
-import { Task } from '../../db/schema';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../redux/store';
+import { addTask, deleteTask, toggleTaskStatus, fetchTasks } from '../redux/';
+
+import type { Task } from '../../db/schema';
 
 type FormData = {
   title: string;
@@ -23,8 +26,8 @@ type FormData = {
 };
 
 export default function ListScreen() {
-  const { getTasks, addTask, deleteTask, toggleTaskStatus } = useORM();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const dispatch = useDispatch();
+  const tasks = useSelector((state: RootState) => state.tasks.tasks);
   const { control, handleSubmit, reset } = useForm<FormData>({
     defaultValues: {
       title: '',
@@ -33,32 +36,27 @@ export default function ListScreen() {
     },
   });
 
-  const loadTasks = async () => {
-    const data = await getTasks();
-    setTasks(data);
-  };
-
   useEffect(() => {
-    loadTasks();
+    dispatch(fetchTasks());
   }, []);
 
-  const onSubmit = async (data: FormData) => {
-    await addTask({
-      title: data.title,
-      date: data.date.toISOString(),
-      priority: data.priority,
-    });
-    await loadTasks();
+  const onSubmit = (data: FormData) => {
+    dispatch(
+      addTask({
+        title: data.title,
+        date: data.date.toISOString(),
+        priority: data.priority,
+      })
+    );
     reset();
   };
 
-  const onToggleStatus = async (task: Task) => {
+  const onToggleStatus = (task: Task) => {
     if (task.status === 'done') {
-      await deleteTask(task.id);
+      dispatch(deleteTask(task.id));
     } else {
-      await toggleTaskStatus(task.id, task.status);
+      dispatch(toggleTaskStatus({ id: task.id, status: task.status }));
     }
-    await loadTasks();
   };
 
   return (

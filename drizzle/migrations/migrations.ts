@@ -1,5 +1,5 @@
 const migrations: Record<string, string> = {
-  '0000_init': `
+  '001_init.sql': `
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -9,4 +9,5 @@ const migrations: Record<string, string> = {
     );
   `,
 };
+
 export default migrations;

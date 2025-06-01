@@ -1,29 +1,17 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { Provider } from 'react-redux';
+import { store } from './redux/store'; // adjust path accordingly
 import { Stack } from 'expo-router/stack';
-import { SQLiteProvider, openDatabaseSync } from 'expo-sqlite';
-import { drizzle } from 'drizzle-orm/expo-sqlite';
-import migrations from '../drizzle/migrations';
-import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
+import { SQLiteProvider } from 'expo-sqlite';
 
 export default function Layout() {
-  const DATABASE_NAME = 'tasks_db';
-
-  const expoDb = openDatabaseSync(DATABASE_NAME);
-
-  const db = drizzle(expoDb);
-
-  useEffect(() => {
-    async function runMigrations() {
-      await migrate(db, { migrations });
-    }
-    runMigrations();
-  }, []);
-
   return (
-    <SQLiteProvider databaseName={DATABASE_NAME} options={{ enableChangeListener: true }}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-    </SQLiteProvider>
+    <Provider store={store}>
+      <SQLiteProvider databaseName="tasks_db" options={{ enableChangeListener: true }}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </SQLiteProvider>
+    </Provider>
   );
 }
